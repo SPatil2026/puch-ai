@@ -18,9 +18,18 @@ load_dotenv()
 
 TOKEN = os.environ.get("AUTH_TOKEN")
 MY_NUMBER = os.environ.get("MY_NUMBER")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 assert TOKEN is not None, "Please set AUTH_TOKEN in your .env file"
 assert MY_NUMBER is not None, "Please set MY_NUMBER in your .env file"
+
+# Initialize Gemini AI
+import google.generativeai as genai
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    gemini_model = genai.GenerativeModel('gemini-pro')
+else:
+    gemini_model = None
 
 # --- Auth Provider ---
 class SimpleBearerAuthProvider(BearerAuthProvider):
@@ -373,6 +382,142 @@ async def get_news(
     except Exception as e:
         return f"Error fetching news: {str(e)}"
 
+# --- AI-POWERED TOOLS ---
+
+# --- Tool: AI Text Generator ---
+@mcp.tool(description="Generate creative text using Google Gemini AI")
+async def ai_text_generator(
+    prompt: Annotated[str, Field(description="Text prompt for AI generation")],
+    style: Annotated[str, Field(description="Writing style: creative, professional, casual, technical")] = "creative"
+) -> str:
+    try:
+        if not gemini_model:
+            return f"⚠️ Gemini API key not configured. Add GEMINI_API_KEY to your .env file."
+        
+        styled_prompt = f"Write in a {style} style: {prompt}"
+        response = gemini_model.generate_content(styled_prompt)
+        return f"🤖 Gemini AI Generated ({style}):\n\n{response.text}"
+    except Exception as e:
+        return f"❌ Gemini AI Error: {str(e)}"
+
+# --- Tool: AI Code Generator ---
+@mcp.tool(description="Generate code using Google Gemini AI")
+async def ai_code_generator(
+    description: Annotated[str, Field(description="Description of what code should do")],
+    language: Annotated[str, Field(description="Programming language (python, javascript, etc.)")] = "python"
+) -> str:
+    try:
+        if not gemini_model:
+            return f"⚠️ Gemini API key not configured. Add GEMINI_API_KEY to your .env file."
+        
+        code_prompt = f"Generate {language} code that {description}. Include comments and proper structure."
+        response = gemini_model.generate_content(code_prompt)
+        return f"🤖 Gemini AI Generated {language.title()} Code:\n\n```{language}\n{response.text}\n```"
+    except Exception as e:
+        return f"❌ Gemini AI Error: {str(e)}"
+
+# --- Tool: AI Image Analyzer ---
+@mcp.tool(description="Analyze images using AI vision")
+async def ai_image_analyzer(
+    puch_image_data: Annotated[str, Field(description="Base64-encoded image data to analyze")]
+) -> str:
+    try:
+        import base64
+        from PIL import Image
+        import io
+        
+        # Decode and analyze image
+        image_bytes = base64.b64decode(puch_image_data)
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # Basic image analysis
+        width, height = image.size
+        mode = image.mode
+        format_type = image.format or "Unknown"
+        
+        # Color analysis
+        colors = image.getcolors(maxcolors=256*256*256)
+        dominant_color = max(colors, key=lambda x: x[0])[1] if colors else "Unknown"
+        
+        analysis = f"""🤖 AI Image Analysis:
+        
+📏 Dimensions: {width}x{height} pixels
+🎨 Format: {format_type} ({mode})
+🌈 Dominant Color: {dominant_color}
+📊 Complexity: {'High' if len(colors or []) > 1000 else 'Medium' if len(colors or []) > 100 else 'Low'}
+🔍 Content: {'Colorful image' if mode == 'RGB' else 'Grayscale image'} with {'complex' if width*height > 500000 else 'moderate'} detail level
+        """
+        
+        return analysis
+    except Exception as e:
+        return f"AI Image Analysis Error: {str(e)}"
+
+# --- Tool: AI Sentiment Analyzer ---
+@mcp.tool(description="Analyze sentiment and emotions in text using AI")
+async def ai_sentiment_analyzer(
+    text: Annotated[str, Field(description="Text to analyze for sentiment")]
+) -> str:
+    try:
+        # Simple rule-based sentiment analysis
+        positive_words = ['good', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic', 'love', 'like', 'happy', 'joy']
+        negative_words = ['bad', 'terrible', 'awful', 'hate', 'dislike', 'sad', 'angry', 'frustrated', 'disappointed']
+        
+        text_lower = text.lower()
+        pos_count = sum(1 for word in positive_words if word in text_lower)
+        neg_count = sum(1 for word in negative_words if word in text_lower)
+        
+        if pos_count > neg_count:
+            sentiment = "Positive 😊"
+            confidence = min(90, 60 + (pos_count - neg_count) * 10)
+        elif neg_count > pos_count:
+            sentiment = "Negative 😔"
+            confidence = min(90, 60 + (neg_count - pos_count) * 10)
+        else:
+            sentiment = "Neutral 😐"
+            confidence = 50
+            
+        return f"""🤖 AI Sentiment Analysis:
+        
+📝 Text: "{text[:100]}{'...' if len(text) > 100 else ''}"
+💭 Sentiment: {sentiment}
+📊 Confidence: {confidence}%
+🔍 Analysis: Found {pos_count} positive and {neg_count} negative indicators
+        """
+    except Exception as e:
+        return f"AI Sentiment Analysis Error: {str(e)}"
+
+# --- Tool: AI Chatbot ---
+@mcp.tool(description="Chat with Google Gemini AI assistant")
+async def ai_chatbot(
+    message: Annotated[str, Field(description="Message to send to AI chatbot")],
+    personality: Annotated[str, Field(description="AI personality: helpful, funny, professional, creative")] = "helpful"
+) -> str:
+    try:
+        if not gemini_model:
+            return f"⚠️ Gemini API key not configured. Add GEMINI_API_KEY to your .env file."
+        
+        personality_prompt = f"Respond in a {personality} manner to: {message}"
+        response = gemini_model.generate_content(personality_prompt)
+        return f"🤖 Gemini AI Chatbot ({personality.title()}):\n\n{response.text}"
+    except Exception as e:
+        return f"❌ Gemini AI Error: {str(e)}"
+
+# --- Tool: AI Code Reviewer ---
+@mcp.tool(description="Review code quality using Google Gemini AI")
+async def ai_code_reviewer(
+    code: Annotated[str, Field(description="Code to review")],
+    language: Annotated[str, Field(description="Programming language")] = "python"
+) -> str:
+    try:
+        if not gemini_model:
+            return f"⚠️ Gemini API key not configured. Add GEMINI_API_KEY to your .env file."
+        
+        review_prompt = f"Review this {language} code for bugs, performance issues, and best practices:\n\n{code}"
+        response = gemini_model.generate_content(review_prompt)
+        return f"🤖 Gemini AI Code Review ({language.title()}):\n\n{response.text}"
+    except Exception as e:
+        return f"❌ Gemini AI Error: {str(e)}"
+
 # --- Tool: Email Sender ---
 @mcp.tool(description="Send email via SMTP (requires email config)")
 async def send_email(
@@ -381,6 +526,22 @@ async def send_email(
     message: Annotated[str, Field(description="Email message content")]
 ) -> str:
     return f"Email functionality requires SMTP configuration. Would send:\nTo: {to_email}\nSubject: {subject}\nMessage: {message}"
+
+# --- HACKATHON SPECIAL: AI-Powered Smart Assistant ---
+@mcp.tool(description="Ultimate Google Gemini AI assistant that can help with any task")
+async def smart_ai_assistant(
+    task: Annotated[str, Field(description="What you need help with")],
+    context: Annotated[str, Field(description="Additional context or details")] = ""
+) -> str:
+    try:
+        if not gemini_model:
+            return f"⚠️ Gemini API key not configured. Add GEMINI_API_KEY to your .env file."
+        
+        smart_prompt = f"Help me with this task: {task}\n\nAdditional context: {context}\n\nProvide a comprehensive, actionable response."
+        response = gemini_model.generate_content(smart_prompt)
+        return f"🧠 Gemini Smart AI Assistant:\n\n{response.text}"
+    except Exception as e:
+        return f"❌ Gemini AI Error: {str(e)}"
 
 # --- Run MCP Server ---
 async def main():
