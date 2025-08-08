@@ -1,0 +1,7 @@
+version: "2"
+authtoken: 2TDVQcCm0YV5gE8CQbkM6_6RkC9Wh3v4K8NpL5Mx
+tunnels:
+  mcp:
+    proto: http
+    addr: localhost:8086
+    bind_tls: true

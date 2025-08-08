@@ -27,7 +27,7 @@ assert MY_NUMBER is not None, "Please set MY_NUMBER in your .env file"
 import google.generativeai as genai
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel('gemini-pro')
+    gemini_model = genai.GenerativeModel('gemini-2.5-flash')
 else:
     gemini_model = None
 
